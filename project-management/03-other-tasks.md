@@ -36,7 +36,7 @@ Notebook: `notebooks/RF_Intrusion_07_CNN_v5_Training_and_Evaluation.ipynb` on `m
 
 - [ ] Radar: confirm the measurement-disjoint split; state that session/subject overlap is unverified
 - [ ] RF: confirm the v4/v5 split policy. Section 6 already scored every loss weight on the test split, so that comparison is not blind. Section 7 then left the test split unscored and kept v4
-- [ ] Acoustic: file-level split, hash dedup, and the padding-shortcut result (ticket 8a)
+- [x] Acoustic: file-level split, hash dedup, and the padding-shortcut result (ticket 8a). The saved models remain valid; no retrain
 - [ ] Thermal: confirm Jacob's recording-disjoint split and frame-sampling policy
 - [ ] Check every metric: macro F1 and per-class recall reported alongside accuracy; thresholds chosen on validation only
 - [ ] Write a one-page checklist result in `docs/` and link it from the report's limitations
@@ -123,7 +123,7 @@ Figure: notebook confusion matrices `[draft]`. A Benign/Machine trade-off figure
 | --- | --- | --- | --- | --- |
 | Radar | measurement | [pending] — session/subject overlap unverified | [pending] | [pending] |
 | RF | [pending] | [pending] | [pending] | [pending] |
-| Acoustic | file (hash-deduplicated) | [pending] — padding-shortcut result | yes (1% / 5% FA) | [pending] |
+| Acoustic | file (hash-deduplicated) | Done — padding shortcut does not explain the saved models | yes (1% / 5% FA) | [pending] |
 | Thermal | recording | [pending] | [pending] | [pending] |
 
 **[pending: one paragraph summarizing the checks and linking to the checklist in `docs/`.]**

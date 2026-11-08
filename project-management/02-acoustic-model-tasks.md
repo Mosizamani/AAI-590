@@ -23,17 +23,13 @@ Only `[final]` paragraphs go to Jacob for the full report (rows 15 and 18). This
 - [x] Random forest (MFCC): test accuracy 0.991, drone F1 0.991, ROC-AUC 1.000
 - [x] Thresholds chosen on validation at 1% and 5% false alarm; test scored once
 
-## 1. Padding-shortcut check (ticket 8a) — do this before tuning
+## 1. Padding-shortcut check (ticket 8a) — done
 
 About 162k windows are zero-padded to 1 s. Because most drone clips last 0.5 s and most no-drone clips are much longer, these are expected to be mostly drone windows; report the exact count per class. A model may learn "half silence = drone."
 
-- [ ] One-feature baseline: fraction of trailing zero samples per window → ROC-AUC on test
-- [ ] Re-score all three saved models on **unpadded** drone windows only vs. no-drone windows
-- [ ] If the shortcut is confirmed, fix it by one of:
-  - [ ] the same crop-and-pad rule for both classes (crop no-drone to 0.5 s and pad), or
-  - [ ] 0.5 s windows for every clip, or
-  - [ ] padding with background noise or a loop of the clip instead of zeros
-- [ ] Retrain the fixed pipeline and report results before and after the fix
+- [x] One-feature baseline: fraction of trailing zero samples per window → test ROC-AUC 0.924
+- [x] Re-score all three saved models on **unpadded** drone windows only vs. no-drone windows
+- [x] The shortcut is not the models' only cue. The three saved models remain valid on this test set, so the windowing was not changed and the models were not retrained.
 
 ## 2. Optimized model (notebook sections 14–15)
 
@@ -93,7 +89,7 @@ The dataset does not record which original corpus or recording site each clip ca
 ## Methodology
 
 ### Splitting and windowing `[draft]`
-*Depends on: Done (baselines); padding-shortcut fix (section 1) may change this paragraph.*
+*Depends on: Done (baselines). The padding check did not change this split.*
 
 Each file, with byte-identical duplicates merged, is one unit, and each unit is assigned entirely to training, validation, or test. No file appears in more than one split.
 
@@ -158,12 +154,12 @@ All models were evaluated on 57,015 held-out test windows (28,681 drone, 28,334 
 
 At the validation-selected 1% false-alarm threshold, the realized test false-alarm rates were 0.8% (transformer), 0.8% (CNN), and 0.9% (random forest), so the validation thresholds transferred well. The CNN and the forest use different features (log-mel image vs MFCC summary), so the gap between them partly reflects the feature as well as the model.
 
-### Padding check `[pending]`
-*Depends on: section 1 — all checkpoints.*
+### Padding check `[draft]`
+*Depends on: section 1 — done. The saved models remain valid; no retrain.*
 
-About 162,000 windows were zero-padded to 1 s, mostly from 0.5 s drone clips. A model could therefore separate the classes partly by detecting trailing silence rather than drone sound, and a random forest scoring near-perfectly on simple MFCC statistics is consistent with that possibility.
+On the test set, 24,341 of 28,681 drone windows (84.9%) are zero-padded, against 47 of 28,334 no-drone windows (0.2%). The fraction of trailing zeros has a test ROC-AUC of 0.924 and, at a 1% false-alarm limit, detects 84.9% of test drone windows. It misses all 4,340 unpadded drone windows.
 
-**[pending: per-class padded-window counts; ROC-AUC of the trailing-zero baseline; scores on unpadded drone windows; results before and after the fix, if one was needed.]**
+Scored on those unpadded drone windows plus every no-drone window, the saved models still detect drones: transformer recall 0.998 (ROC-AUC 1.000), CNN recall 0.953 (ROC-AUC 0.996), and random forest recall 0.955 (ROC-AUC 0.997), with false-alarm rates of 0.8–0.9%. The published scores stand, and the models were not retrained.
 
 ### Optimized model `[pending]`
 *Depends on: section 2 — all checkpoints.*
@@ -178,7 +174,7 @@ About 162,000 windows were zero-padded to 1 s, mostly from 0.5 s drone clips. A 
 Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` · ROC overlay `[draft]` · recall vs SNR `[pending]`
 
 ## Limitations `[draft]`
-*Depends on: none; revise after the padding and robustness results.*
+*Depends on: padding check is done; revise again after the robustness results.*
 
 - The results measure performance on DADS only. Without source or site labels, they do not establish performance on new microphones, sites, distances, or drone types.
 - Windows from the same file are correlated, so window-level metrics overstate the effective sample size; confidence intervals should be computed over files.
