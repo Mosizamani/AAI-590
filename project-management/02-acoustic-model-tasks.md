@@ -41,12 +41,12 @@ About 162k windows are zero-padded to 1 s. Because most drone clips last 0.5 s a
 - [ ] Score the optimized model once on the same test windows; compare with the three saved models
 - [ ] Bootstrap 95% confidence intervals **over files**, not windows
 
-## 3. Noise robustness (plan row 6)
+## 3. Noise robustness (plan row 6) — done
 
-- [ ] Choose noise sources (e.g. ESC-50, UrbanSound8K subsets) and record their licenses
-- [ ] Mix noise only into test-time copies of held-out windows at fixed SNRs (e.g. 20, 10, 5, 0, −5 dB)
-- [ ] Keep the clean-validation threshold fixed; report recall, false-alarm rate, and F1 per SNR
-- [ ] Report the robustness results separately from the clean results
+- [x] Choose noise sources (e.g. ESC-50, UrbanSound8K subsets) and record their licenses. ESC-50 subset, CC BY-NC 3.0, 400 clips from 10 categories
+- [x] Mix noise only into test-time copies of held-out windows at fixed SNRs (20, 10, 5, 0, −5 dB)
+- [x] Keep the clean-validation threshold fixed; report recall, false-alarm rate, and F1 per SNR
+- [x] Report the robustness results separately from the clean results
 
 ## 4. Repository artifacts (ticket 8)
 
@@ -166,17 +166,22 @@ Scored on those unpadded drone windows plus every no-drone window, the saved mod
 
 **[pending: optimized-model row added to the table; file-level bootstrap 95% confidence intervals; latency and model size.]**
 
-### Noise robustness `[pending]`
-*Depends on: section 3 — all checkpoints.*
+### Noise robustness `[draft]`
+*Depends on: section 3 — done. Reported separately from the clean comparison.*
 
-**[pending: noise sources and licenses; recall, false-alarm rate, and F1 at 20, 10, 5, 0, and −5 dB SNR with the clean-validation threshold held fixed.]**
+Noise was mixed only into copies of the 57,015 test windows. The source is 400 ESC-50 clips (Piczak, 2015) from rain, sea waves, wind, thunderstorm, engine, train, helicopter, airplane, crackling fire, and chainsaw, under CC BY-NC 3.0. Each copy was scored at 20, 10, 5, 0, and −5 dB. The threshold is the clean-validation 1% false-alarm point and was not refit.
 
-Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` · ROC overlay `[draft]` · recall vs SNR `[pending]`
+At 20 dB, drone recall falls from the clean operating point to 0.308 (transformer), 0.445 (CNN), and 0.148 (random forest). At −5 dB those recalls are 0.190, 0.267, and 0.075. False-alarm rates rise with the noise: 0.105 for the transformer at −5 dB, at most 0.050 for the CNN, and 0.087 for the forest at 0 dB. The clean scores in the comparison table still stand. The three models are not robust to this added noise.
+
+The decibel number is the signal-to-noise ratio: the power of the original window compared with the power of the noise mixed into it. At 0 dB the two powers are equal. A positive value means the window is louder than the noise, and a negative value means the noise is louder. At 20 dB the window has about 100 times the noise power. At 10 dB it has about 10 times, and at 5 dB about 3 times. At −5 dB the noise has about 3.2 times the power of the window, so the clip is mostly noise.
+
+Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` · ROC overlay `[draft]` · recall vs SNR `[draft]`
 
 ## Limitations `[draft]`
-*Depends on: padding check is done; revise again after the robustness results.*
+*Depends on: padding check and noise robustness are done.*
 
-- The results measure performance on DADS only. Without source or site labels, they do not establish performance on new microphones, sites, distances, or drone types.
+- The results measure performance on DADS only. Without source or site labels, they do not establish performance on new microphones, sites, distances, or drone types. Added ESC-50 noise is a separate test-time mix, not a field recording, and some of those clips (helicopter, airplane, engine) can themselves resemble a drone.
+- The clean comparison still stands. At the fixed 1% false-alarm threshold, drone recall falls below 0.45 for every model once ESC-50 noise is mixed in at 20 dB.
 - Windows from the same file are correlated, so window-level metrics overstate the effective sample size; confidence intervals should be computed over files.
 - Scores are concentrated near 0 and 1 and are not calibrated probabilities unless the calibration checkpoint is completed.
 - The acoustic recordings are not synchronized with the RF, radar, or thermal data. Acoustic outputs enter the coordination agent only through clearly labeled simulated replay scenarios and do not demonstrate real-world sensor fusion.
@@ -186,5 +191,7 @@ Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` ·
 Gong, Y., Chung, Y.-A., & Glass, J. (2021). AST: Audio spectrogram transformer. *Proceedings of Interspeech 2021*, 571–575. https://doi.org/10.21437/Interspeech.2021-698
 
 Park, D. S., Chan, W., Zhang, Y., Chiu, C.-C., Zoph, B., Cubuk, E. D., & Le, Q. V. (2019). SpecAugment: A simple data augmentation method for automatic speech recognition. *Proceedings of Interspeech 2019*, 2613–2617. https://doi.org/10.21437/Interspeech.2019-2680
+
+Piczak, K. J. (2015). ESC: Dataset for environmental sound classification. *Proceedings of the 23rd ACM International Conference on Multimedia*, 1015–1018. https://doi.org/10.1145/2733373.2806390
 
 Z121mm. (n.d.). *Drone-audio-detection-samples* [Data set]. Hugging Face. https://huggingface.co/datasets/Z121mm/drone-audio-detection-samples
