@@ -31,33 +31,62 @@ About 162k windows are zero-padded to 1 s. Because most drone clips last 0.5 s a
 - [x] Re-score all three saved models on **unpadded** drone windows only vs. no-drone windows
 - [x] The shortcut is not the models' only cue. The three saved models remain valid on this test set, so the windowing was not changed and the models were not retrained.
 
-## 1b. Noise × padding split (ticket 8b) — do before section 2
+## 1b. Noise × padding split (ticket 8b) — done
 
 At 20 dB (noise about 1% of the window's power), drone recall falls from about 1.0 to 0.308 / 0.445 / 0.148 (transformer / CNN / forest). The forest's 0.148 is close to the unpadded share of test drone windows (15.1%), and recall is not monotonic in SNR. Noise is added across the whole second, so it fills the zero-padded tail. Hypothesis: on padded windows the models rely on the digital-silence tail, and the drop is mostly that artifact rather than noise level.
 
-- [ ] Re-use the section 13.2 noisy mixes: same ESC-50 draw, same SNRs, same seed. No new mixing
-- [ ] Keep each model's clean-validation 1% false-alarm threshold fixed; do not refit
-- [ ] Split drone windows by the existing padded flag (test: 24,341 padded, 4,340 unpadded)
-- [ ] Per model and SNR (clean, 20, 10, 5, 0, −5 dB): recall on padded drone windows, recall on unpadded drone windows. The false-alarm rate stays on all no-drone windows (only 47 are padded)
-- [ ] Save `results/acoustic/noise_robustness_by_padding.csv` and plot recall vs SNR with padded and unpadded lines per model
-- [ ] Decide and record the outcome:
-  - Unpadded recall stays well above padded under noise → padding artifact confirmed. Update the noise paragraph and limitations; fix windowing (drop short clips, loop/reflect, or pad with background noise) and retrain before section 2
-  - Both groups drop about the same → real noise sensitivity. Keep the current write-up; add noise augmentation to the section 2 search space
-- [ ] Report the unpadded-window numbers as the deployment-relevant robustness figure (real microphones never produce digital zeros)
+- [x] Re-use the section 13.2 noisy mixes: same ESC-50 draw, same SNRs, same seed. No new mixing. Overall recall matches `noise_robustness.csv` at every SNR
+- [x] Keep each model's clean-validation 1% false-alarm threshold fixed; do not refit
+- [x] Split drone windows by the existing padded flag (test: 24,341 padded, 4,340 unpadded)
+- [x] Per model and SNR (clean, 20, 10, 5, 0, −5 dB): recall on padded drone windows, recall on unpadded drone windows. The false-alarm rate stays on all no-drone windows (only 47 are padded)
+- [x] Saved `results/acoustic/noise_robustness_by_padding.csv` and `results/acoustic/recall_vs_snr_by_padding.png`
+- [x] Outcome: padding artifact confirmed. At 20 dB, unpadded recall is 0.991 / 0.936 / 0.912 and padded recall is 0.186 / 0.357 / 0.012 (transformer / CNN / forest). Every gap is above 0.20
+- [x] Unpadded-window recall is the deployment-relevant robustness figure. Real microphones never produce a digital-zero tail
 
-The 20 dB gap is read before any retuning. Unpadded recall at least 0.20 above padded recall for every model confirms the padding artifact. A gap under 0.10 for every model is treated as the same drop in both groups.
+Short clips are kept and rewindowed before section 2. Dropping them would remove about 85% of the drone windows. The three saved models stay as the "before" models.
 
-## 2. Optimized model (notebook sections 14–15)
+## 2. Optimized CNN (ticket 8c, notebook sections 14–15)
 
-Do not start until section 1b has decided whether these windows stay.
+Fix the two problems ticket 8b found. The three saved baselines stay as they are and become the "before" models; they are rescored, not retrained.
 
-- [ ] Tune with Optuna on validation only: learning rate, batch size, dropout, weight decay, augmentation strength, window length
-- [ ] Keep a results table of every run; change one thing at a time
-- [ ] Temperature scaling on validation; report expected calibration error before and after (needed for the agent's `score_calibrated`)
-- [ ] Re-select the 1% and 5% false-alarm thresholds on validation
-- [ ] Optional: distillation, quantization, or ONNX export; measure latency and model size
-- [ ] Score the optimized model once on the same test windows; compare with the three saved models
-- [ ] Bootstrap 95% confidence intervals **over files**, not windows
+The spectrogram CNN (92,930 parameters) is the model that is optimized, because it is the cheapest to retrain many times and the most practical for real-time use on a sensor. This choice is size and latency, not the noise test. On unpadded noisy windows the transformer scores higher (0.991 vs 0.936 at 20 dB, 0.412 vs 0.306 at −5 dB). The transformer is a candidate for the same treatment later.
+
+### 2.1 Write-up corrections from 8b
+
+- [x] Noise paragraph: the two findings replace "not robust to this ESC-50 noise" (padding artifact at moderate noise, real loss on full-length audio near 0 to −5 dB). "The CNN keeps the highest recall" is limited to all windows. The transformer leads on unpadded windows
+- [x] Padding paragraph: clean scores stand, and the noise test showed that padding matters, so short clips are rewindowed before optimization
+- [x] Full unpadded table (clean, 20, 10, 5, 0, −5 dB) is the headline robustness figure
+
+### 2.2 Rewindow the short clips
+
+- [x] Replace zero-padding: each short window keeps its samples, and the tail points at a training no-drone clip scaled to 20 dB below the clip when the waveform is built. Short clips were not dropped. `dataset2-processed/windows_v2.csv` has 225,361 `none` and 162,478 `background`
+- [x] The file-level split is unchanged. `fill` is `none` or `background`
+- [x] No accepted background crop has 160 or more consecutive digital zeros (440 crops were redrawn). The old trailing-zero score is 0 on all 57,015 test windows, so its ROC-AUC is 0.500
+- [ ] Rebuild log-mel features and the training-only scale from the new windows
+
+### 2.3 Noise augmentation (train only)
+
+- [ ] Keep augmentation noise separate from the test noise: augment with ESC-50 folds 1–4 and rebuild the robustness test mix from fold 5 only (or use a different noise source for training)
+- [ ] Mix noise into training windows at random SNRs (for example −5 to 20 dB) with a set probability. Validation and test stay clean except for the robustness mix
+- [ ] Build a noisy validation copy (fold 1–4 noise, fixed seed) for model selection
+
+### 2.4 Ablation, then tuning
+
+- [ ] Run A: CNN on rewindowed data, original section 8 settings, no augmentation (one run)
+- [ ] Run B: run A plus noise augmentation (one run)
+- [ ] Run C: Optuna on run B, validation only: learning rate, batch size, dropout, weight decay, augmentation probability and SNR range. Objective: clean validation ROC-AUC plus noisy validation recall at the 1% false-alarm threshold
+- [ ] Keep a results table of every run
+- [ ] Temperature scaling on clean validation; report expected calibration error before and after (needed for the agent's `score_calibrated`)
+- [ ] Re-select the 1% and 5% false-alarm thresholds on clean validation
+- [ ] Optional: quantization or ONNX export; measure latency and model size
+
+### 2.5 Evaluation (test once)
+
+- [ ] Score runs A, B, C and the three saved baselines on the same rewindowed test windows. The baselines are rescored only; a drop shows how much they relied on the zeros
+- [ ] Report the clean comparison, then the fold-5 noise test by SNR, split by original padded / unpadded windows
+- [ ] Report the step effects: baseline → A (rewindowing) → B (augmentation) → C (tuning)
+- [ ] Bootstrap 95% confidence intervals over files, not windows
+- [ ] State in the report that the baselines were trained on zero-padded data and the optimized CNN was not
 
 ## 3. Noise robustness (plan row 6) — done
 
@@ -177,29 +206,39 @@ At the validation-selected 1% false-alarm threshold, the realized test false-ala
 
 On the test set, 24,341 of 28,681 drone windows (84.9%) are zero-padded, against 47 of 28,334 no-drone windows (0.2%). The fraction of trailing zeros has a test ROC-AUC of 0.924 and, at a 1% false-alarm limit, detects 84.9% of test drone windows. It misses all 4,340 unpadded drone windows.
 
-Scored on those unpadded drone windows plus every no-drone window, the saved models still detect drones: transformer recall 0.998 (ROC-AUC 1.000), CNN recall 0.953 (ROC-AUC 0.996), and random forest recall 0.955 (ROC-AUC 0.997), with false-alarm rates of 0.8–0.9%. The published scores stand, and the models were not retrained.
+Scored on those unpadded drone windows plus every no-drone window, the saved models still detect drones: transformer recall 0.998 (ROC-AUC 1.000), CNN recall 0.953 (ROC-AUC 0.996), and random forest recall 0.955 (ROC-AUC 0.997), with false-alarm rates of 0.8–0.9%. The published clean scores stand, and the three saved models were not retrained. The noise test showed that padding does matter once the zero tail is filled, so the short clips are rewindowed before optimization.
 
 ### Optimized model `[pending]`
-*Depends on: section 2 — all checkpoints.*
+*Depends on: section 2 — runs A, B, and C. The CNN is optimized for size and latency. The transformer remains a candidate for the same treatment later.*
 
-**[pending: optimized-model row added to the table; file-level bootstrap 95% confidence intervals; latency and model size.]**
+**[pending: runs A, B, and C on rewindowed windows; clean comparison; fold-5 noise test split by the original padded flag; file-level bootstrap 95% confidence intervals; latency and model size. The baselines were trained on zero-padded data and are rescored only.]**
 
 ### Noise robustness `[draft]`
 *Depends on: section 3 — done. Reported separately from the clean comparison.*
 
 Noise was mixed only into copies of the 57,015 test windows. The source is 400 ESC-50 clips (Piczak, 2015) from rain, sea waves, wind, thunderstorm, engine, train, helicopter, airplane, crackling fire, and chainsaw, under CC BY-NC 3.0. Each copy was scored at 20, 10, 5, 0, and −5 dB. The threshold is the clean-validation 1% false-alarm point and was not refit.
 
-At 20 dB, drone recall falls from the clean operating point to 0.308 (transformer), 0.445 (CNN), and 0.148 (random forest). At −5 dB those recalls are 0.190, 0.267, and 0.075. False-alarm rates rise with the noise: 0.105 for the transformer at −5 dB, at most 0.050 for the CNN, and 0.087 for the forest at 0 dB. The clean scores in the comparison table still stand. The three models are not robust to this added noise.
+At 20 dB, drone recall on all windows falls from the clean operating point to 0.308 (transformer), 0.445 (CNN), and 0.148 (random forest). At −5 dB those all-window recalls are 0.190, 0.267, and 0.075. On all windows, the CNN keeps the highest recall at both ends. False-alarm rates rise with the noise: 0.105 for the transformer at −5 dB, at most 0.050 for the CNN, and 0.087 for the forest at 0 dB. The clean scores in the comparison table still stand.
+
+Two findings sit under that all-window table. At moderate noise the drop is a padding artifact: the mix fills the digital-zero tail of the short clips. On full-length audio the loss is real near 0 dB to −5 dB, where the noise is about as loud as the window. The transformer leads on unpadded windows (0.991 vs 0.936 at 20 dB, 0.412 vs 0.306 at −5 dB). The CNN is still the model that is optimized, because it has 92,930 parameters and is the practical real-time model, not because it wins this noise test.
+
+Unpadded recall is the headline robustness figure. A real microphone does not leave a stretch of digital zeros. The false-alarm rate stays on all no-drone windows.
+
+| Model | Clean | 20 dB | 10 dB | 5 dB | 0 dB | −5 dB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Spectrogram transformer | 0.998 | 0.991 | 0.943 | 0.848 | 0.659 | 0.412 |
+| Spectrogram CNN | 0.953 | 0.936 | 0.820 | 0.662 | 0.475 | 0.306 |
+| Random forest | 0.955 | 0.912 | 0.770 | 0.631 | 0.450 | 0.268 |
 
 The decibel number is the signal-to-noise ratio: the power of the original window compared with the power of the noise mixed into it. At 0 dB the two powers are equal. A positive value means the window is louder than the noise, and a negative value means the noise is louder. At 20 dB the window has about 100 times the noise power. At 10 dB it has about 10 times, and at 5 dB about 3 times. At −5 dB the noise has about 3.2 times the power of the window, so the clip is mostly noise.
 
-Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` · ROC overlay `[draft]` · recall vs SNR `[draft]`
+Figures: class/duration distribution `[draft]` · mean spectrograms `[draft]` · ROC overlay `[draft]` · recall vs SNR `[draft]` · recall vs SNR by padding `[draft]`
 
 ## Limitations `[draft]`
-*Depends on: padding check and noise robustness are done.*
+*Depends on: padding check, noise robustness, and the noise × padding split are done.*
 
 - The results measure performance on DADS only. Without source or site labels, they do not establish performance on new microphones, sites, distances, or drone types. Added ESC-50 noise is a separate test-time mix, not a field recording, and some of those clips (helicopter, airplane, engine) can themselves resemble a drone.
-- The clean comparison still stands. At the fixed 1% false-alarm threshold, drone recall falls below 0.45 for every model once ESC-50 noise is mixed in at 20 dB.
+- The clean comparison still stands. The 20 dB recall below 0.45 is mostly the 24,341 padded drone windows: noise fills their digital-zero tail. On the 4,340 unpadded drone windows, 20 dB recall stays at 0.991 / 0.936 / 0.912. That unpadded figure is the one that applies to a real microphone. Windowing still has to be fixed, and the models retrained, before the CNN fine-tune is run.
 - Windows from the same file are correlated, so window-level metrics overstate the effective sample size; confidence intervals should be computed over files.
 - Scores are concentrated near 0 and 1 and are not calibrated probabilities unless the calibration checkpoint is completed.
 - The acoustic recordings are not synchronized with the RF, radar, or thermal data. Acoustic outputs enter the coordination agent only through clearly labeled simulated replay scenarios and do not demonstrate real-world sensor fusion.
