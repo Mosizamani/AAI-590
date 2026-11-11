@@ -31,7 +31,25 @@ About 162k windows are zero-padded to 1 s. Because most drone clips last 0.5 s a
 - [x] Re-score all three saved models on **unpadded** drone windows only vs. no-drone windows
 - [x] The shortcut is not the models' only cue. The three saved models remain valid on this test set, so the windowing was not changed and the models were not retrained.
 
+## 1b. Noise × padding split (ticket 8b) — do before section 2
+
+At 20 dB (noise about 1% of the window's power), drone recall falls from about 1.0 to 0.308 / 0.445 / 0.148 (transformer / CNN / forest). The forest's 0.148 is close to the unpadded share of test drone windows (15.1%), and recall is not monotonic in SNR. Noise is added across the whole second, so it fills the zero-padded tail. Hypothesis: on padded windows the models rely on the digital-silence tail, and the drop is mostly that artifact rather than noise level.
+
+- [ ] Re-use the section 13.2 noisy mixes: same ESC-50 draw, same SNRs, same seed. No new mixing
+- [ ] Keep each model's clean-validation 1% false-alarm threshold fixed; do not refit
+- [ ] Split drone windows by the existing padded flag (test: 24,341 padded, 4,340 unpadded)
+- [ ] Per model and SNR (clean, 20, 10, 5, 0, −5 dB): recall on padded drone windows, recall on unpadded drone windows. The false-alarm rate stays on all no-drone windows (only 47 are padded)
+- [ ] Save `results/acoustic/noise_robustness_by_padding.csv` and plot recall vs SNR with padded and unpadded lines per model
+- [ ] Decide and record the outcome:
+  - Unpadded recall stays well above padded under noise → padding artifact confirmed. Update the noise paragraph and limitations; fix windowing (drop short clips, loop/reflect, or pad with background noise) and retrain before section 2
+  - Both groups drop about the same → real noise sensitivity. Keep the current write-up; add noise augmentation to the section 2 search space
+- [ ] Report the unpadded-window numbers as the deployment-relevant robustness figure (real microphones never produce digital zeros)
+
+The 20 dB gap is read before any retuning. Unpadded recall at least 0.20 above padded recall for every model confirms the padding artifact. A gap under 0.10 for every model is treated as the same drop in both groups.
+
 ## 2. Optimized model (notebook sections 14–15)
+
+Do not start until section 1b has decided whether these windows stay.
 
 - [ ] Tune with Optuna on validation only: learning rate, batch size, dropout, weight decay, augmentation strength, window length
 - [ ] Keep a results table of every run; change one thing at a time
